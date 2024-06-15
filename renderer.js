@@ -89,7 +89,7 @@ function handleToggleDeleteButtons() {
 }
 
 function updateElementCount(count) {
-  document.getElementById('element-count').textContent = `Number of elements: ${count}`;
+  document.getElementById('element-count').textContent = `Files: ${count}`;
 }
 
 async function displayFiles(files, categories, listSubfolders) {
@@ -101,7 +101,7 @@ async function displayFiles(files, categories, listSubfolders) {
   categoriesContainer.appendChild(allFilesDiv);
 
   const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', '#000000', true);
-  recentFilesDiv.addEventListener('click', displayRecentFiles);
+  recentFilesDiv.addEventListener('click', () => displayCategoryFiles('Recent Files', files.recent, '#f4f4f4', '#000000', listSubfolders, categories));
   categoriesContainer.appendChild(recentFilesDiv);
 
   document.getElementById('clear-recent-files-btn').addEventListener('click', async (event) => {
@@ -120,14 +120,19 @@ async function displayFiles(files, categories, listSubfolders) {
   toggleCategoryButtons(document.getElementById('toggle-category-buttons').checked);
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 
-  displayCategoryFiles('All Files', files.all, '#f4f4f4', '#000000', listSubfolders, categories);
+  // Display the first category by default
+  if (categories.length > 0) {
+    displayCategoryFiles(categories[0].name, files[categories[0].name], categories[0].color, categories[0].textColor, listSubfolders, categories);
+  }
 }
 
 function displayCategoryFiles(categoryName, files, color, textColor, listSubfolders, categories) {
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = categoryName;
-  categoryTitle.style.backgroundColor = color;
-  categoryTitle.style.color = textColor;
+
+  // Set CSS variables for dynamic styling
+  document.documentElement.style.setProperty('--dynamic-bg-color', color);
+  document.documentElement.style.setProperty('--dynamic-text-color', textColor);
 
   const fileList = document.getElementById('current-files');
   fileList.innerHTML = '';
@@ -138,7 +143,18 @@ function displayCategoryFiles(categoryName, files, color, textColor, listSubfold
   });
 
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
+
+  // Highlight the selected category
+  const categoryItems = document.querySelectorAll('.category-item');
+  categoryItems.forEach(item => {
+    if (item.textContent === categoryName) {
+      item.parentNode.classList.add('selected-category');
+    } else {
+      item.parentNode.classList.remove('selected-category');
+    }
+  });
 }
+
 
 async function displayRecentFiles() {
   const recentFiles = await window.api.readRecentFiles();
@@ -146,6 +162,7 @@ async function displayRecentFiles() {
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = 'Recent Files';
   categoryTitle.style.backgroundColor = '#f4f4f4';
+  categoryTitle.style.color = '#000000';
 
   const fileList = document.getElementById('current-files');
   fileList.innerHTML = '';

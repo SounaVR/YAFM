@@ -58,6 +58,10 @@
     .file-list li button {
       margin-right: 10px;
     }
+    #current-category-title {
+      background-color: var(--dynamic-bg-color) !important;
+      color: var(--dynamic-text-color) !important;
+    }
   </style>
 </head>
 <body>
@@ -81,13 +85,11 @@
     </div>
   </div>
   <div id="main-content">
-    <h1 id="current-category-title" class="bg-secondary text-white p-3">File Manager</h1>
-    <div>
-      <span id="element-count" class="badge badge-secondary"></span>
-    </div>
+    <h3 id="current-category-title" class="bg-secondary text-white p-3">File Manager</h3>
     <div class="my-3">
       <button id="select-folder-btn" class="btn btn-info">Select Folder</button>
       <span id="selected-folder-path" class="ml-2"></span>
+      <span id="element-count" class="badge badge-secondary"></span>
     </div>
     <ul id="current-files" class="file-list">
       <!-- Files will be injected here based on the selected category -->
