@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (watchFolder) {
     const files = await window.api.getFiles(watchFolder, getCategories(), listSubfolders);
-    displayFiles(files, getCategories());
+    displayFiles(files, getCategories(), listSubfolders);
     updateElementCount(files.all.length);
   }
 
@@ -29,7 +29,7 @@ document.getElementById('select-folder-btn').addEventListener('click', async () 
     const categories = getCategories();
     const listSubfolders = document.getElementById('list-subfolders').checked;
     const files = await window.api.getFiles(folderPath, categories, listSubfolders);
-    displayFiles(files, categories);
+    displayFiles(files, categories, listSubfolders);
     saveSettings({ watchFolder: folderPath, categories, listSubfolders, showDeleteButtons: true });
     updateElementCount(files.all.length);
   }
@@ -75,7 +75,7 @@ async function handleListSubfoldersChange() {
 
   saveSettings({ watchFolder, categories, listSubfolders, showDeleteButtons });
   const files = await window.api.getFiles(watchFolder, categories, listSubfolders);
-  displayFiles(files, categories);
+  displayFiles(files, categories, listSubfolders);
   updateElementCount(files.all.length);
 }
 
@@ -92,12 +92,12 @@ function updateElementCount(count) {
   document.getElementById('element-count').textContent = `Number of elements: ${count}`;
 }
 
-async function displayFiles(files, categories) {
+async function displayFiles(files, categories, listSubfolders) {
   const categoriesContainer = document.getElementById('categories');
   categoriesContainer.innerHTML = ''; // Clear existing categories
 
   const allFilesDiv = createCategoryDiv('All Files', '#f4f4f4');
-  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4'));
+  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders));
   categoriesContainer.appendChild(allFilesDiv);
 
   const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', true);
@@ -112,7 +112,7 @@ async function displayFiles(files, categories) {
 
   categories.forEach((category, index) => {
     const categoryDiv = createCategoryDiv(category.name, category.color, false, true);
-    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color)); // Ensure the event listener is attached here
+    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, listSubfolders));
     categoriesContainer.appendChild(categoryDiv);
     addCategoryButtonsEventListeners(categoryDiv, index, category.name);
   });
@@ -120,7 +120,7 @@ async function displayFiles(files, categories) {
   toggleCategoryButtons(document.getElementById('toggle-category-buttons').checked);
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 
-  displayCategoryFiles('All Files', files.all, '#f4f4f4');
+  displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders);
 }
 
 async function displayRecentFiles() {
@@ -139,7 +139,7 @@ async function displayRecentFiles() {
   });
 }
 
-function displayCategoryFiles(categoryName, files, color) {
+function displayCategoryFiles(categoryName, files, color, listSubfolders) {
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = categoryName;
   categoryTitle.style.backgroundColor = color;
@@ -148,20 +148,21 @@ function displayCategoryFiles(categoryName, files, color) {
   fileList.innerHTML = '';
 
   files.forEach(file => {
-    const li = createFileElement(file);
+    const li = createFileElement(file, listSubfolders);
     fileList.appendChild(li);
   });
 
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
-function createFileElement(file) {
+function createFileElement(file, listSubfolders) {
   const li = document.createElement('li');
   li.className = 'align-items-center';
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '🗑️';
   deleteBtn.className = 'btn btn-danger btn-sm delete-button';
+  deleteBtn.style.display = 'none';
   deleteBtn.addEventListener('click', async (event) => {
     event.stopPropagation();
     if (confirm(`Are you sure you want to delete the file: ${file.name}?`)) {
@@ -173,7 +174,7 @@ function createFileElement(file) {
   });
   li.appendChild(deleteBtn);
 
-  if (file.isDirectory) {
+  if (file.isDirectory && !listSubfolders) {
     const dropdownBtn = document.createElement('button');
     dropdownBtn.innerHTML = '&#x25BC;'; // Unicode for down arrow
     dropdownBtn.className = 'btn btn-secondary btn-sm';
@@ -191,7 +192,7 @@ function createFileElement(file) {
         subFilesList = document.createElement('ul');
         subFilesList.className = 'list-group ml-3';
         subFiles.all.forEach(subFile => {
-          const subLi = createFileElement(subFile);
+          const subLi = createFileElement(subFile, listSubfolders);
           subFilesList.appendChild(subLi);
         });
         li.appendChild(subFilesList);
@@ -266,7 +267,7 @@ async function refreshFileList() {
   const categories = getCategories();
   if (watchFolder) {
     const files = await window.api.getFiles(watchFolder, categories, listSubfolders);
-    displayFiles(files, categories);
+    displayFiles(files, categories, listSubfolders);
     updateElementCount(files.all.length);
   }
 }

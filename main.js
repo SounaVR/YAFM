@@ -94,10 +94,13 @@ const walkSync = async (dir, listSubfolders, fileList = []) => {
     for (const file of files) {
       const filePath = path.join(dir, file);
       const stats = await fs.promises.stat(filePath);
-      if (stats.isDirectory() && listSubfolders) {
-        await walkSync(filePath, listSubfolders, fileList);
-      } else if (stats.isFile()) {
-        fileList.push({ path: filePath, name: file, isDirectory: stats.isDirectory() });
+      if (stats.isDirectory()) {
+        fileList.push({ path: filePath, name: file, isDirectory: true });
+        if (listSubfolders) {
+          await walkSync(filePath, listSubfolders, fileList);
+        }
+      } else {
+        fileList.push({ path: filePath, name: file, isDirectory: false });
       }
     }
     return fileList;
@@ -110,7 +113,7 @@ const walkSync = async (dir, listSubfolders, fileList = []) => {
 ipcMain.handle('get-files', async (event, folderPath, categories, listSubfolders) => {
   try {
     const allFiles = await walkSync(folderPath, listSubfolders);
-    const recentFiles = await readRecentFiles(); // Call the function directly
+    const recentFiles = await readRecentFiles();
     const categorizedFiles = { all: allFiles, recent: recentFiles };
 
     categories.forEach(category => {
