@@ -140,7 +140,7 @@ async function displayRecentFiles() {
     const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default color if no category matches
 
     const li = document.createElement('li');
-    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.className = 'align-items-center';
     li.style.backgroundColor = color; // Apply the category color
 
     const deleteBtn = document.createElement('button');
