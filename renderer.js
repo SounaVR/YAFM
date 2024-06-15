@@ -134,9 +134,40 @@ async function displayRecentFiles() {
 
   recentFiles.forEach(filePath => {
     const li = document.createElement('li');
-    li.textContent = filePath;
+    li.className = 'align-items-center';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.className = 'btn btn-danger btn-sm delete-button';
+    deleteBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (confirm(`Are you sure you want to delete the file: ${filePath}?`)) {
+        const success = await window.api.deleteFile(filePath);
+        if (success) {
+          displayRecentFiles();
+        }
+      }
+    });
+
+    li.appendChild(deleteBtn);
+
+    li.appendChild(document.createTextNode(filePath));
+
+    li.addEventListener('click', async () => {
+      await window.api.logFilePath(filePath);
+      window.api.openFile(filePath);
+    });
+
+    li.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.api.openLocation(filePath);
+    });
+
     fileList.appendChild(li);
   });
+
+  toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
 function displayCategoryFiles(categoryName, files, color, listSubfolders) {
