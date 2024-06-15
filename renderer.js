@@ -96,11 +96,11 @@ async function displayFiles(files, categories, listSubfolders) {
   const categoriesContainer = document.getElementById('categories');
   categoriesContainer.innerHTML = ''; // Clear existing categories
 
-  const allFilesDiv = createCategoryDiv('All Files', '#f4f4f4');
-  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders, categories));
+  const allFilesDiv = createCategoryDiv('All Files', '#f4f4f4', '#000000');
+  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', '#000000', listSubfolders, categories));
   categoriesContainer.appendChild(allFilesDiv);
 
-  const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', true);
+  const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', '#000000', true);
   recentFilesDiv.addEventListener('click', displayRecentFiles);
   categoriesContainer.appendChild(recentFilesDiv);
 
@@ -111,8 +111,8 @@ async function displayFiles(files, categories, listSubfolders) {
   });
 
   categories.forEach((category, index) => {
-    const categoryDiv = createCategoryDiv(category.name, category.color, false, true);
-    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, listSubfolders, categories));
+    const categoryDiv = createCategoryDiv(category.name, category.color, category.textColor, false, true);
+    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, category.textColor, listSubfolders, categories));
     categoriesContainer.appendChild(categoryDiv);
     addCategoryButtonsEventListeners(categoryDiv, index, category.name);
   });
@@ -120,7 +120,24 @@ async function displayFiles(files, categories, listSubfolders) {
   toggleCategoryButtons(document.getElementById('toggle-category-buttons').checked);
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 
-  displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders, categories);
+  displayCategoryFiles('All Files', files.all, '#f4f4f4', '#000000', listSubfolders, categories);
+}
+
+function displayCategoryFiles(categoryName, files, color, textColor, listSubfolders, categories) {
+  const categoryTitle = document.getElementById('current-category-title');
+  categoryTitle.textContent = categoryName;
+  categoryTitle.style.backgroundColor = color;
+  categoryTitle.style.color = textColor;
+
+  const fileList = document.getElementById('current-files');
+  fileList.innerHTML = '';
+
+  files.forEach(file => {
+    const li = createFileElement(file, listSubfolders, categories);
+    fileList.appendChild(li);
+  });
+
+  toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
 async function displayRecentFiles() {
@@ -177,32 +194,18 @@ async function displayRecentFiles() {
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
-function displayCategoryFiles(categoryName, files, color, listSubfolders, categories) {
-  const categoryTitle = document.getElementById('current-category-title');
-  categoryTitle.textContent = categoryName;
-  categoryTitle.style.backgroundColor = color;
-
-  const fileList = document.getElementById('current-files');
-  fileList.innerHTML = '';
-
-  files.forEach(file => {
-    const li = createFileElement(file, listSubfolders, categories);
-    fileList.appendChild(li);
-  });
-
-  toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
-}
-
 function createFileElement(file, listSubfolders, categories) {
   const li = document.createElement('li');
   li.className = 'align-items-center';
 
-  // Determine the color based on file category
+  // Determine the color and text color based on file category
   const fileCategory = categories.find(category =>
     category.extensions.some(ext => file.path.endsWith(ext))
   );
-  const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default color if no category matches
+  const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default background color if no category matches
+  const textColor = fileCategory ? fileCategory.textColor : '#000000'; // Default text color if no category matches
   li.style.backgroundColor = color;
+  li.style.color = textColor;
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '🗑️';
@@ -268,10 +271,11 @@ function createFileElement(file, listSubfolders, categories) {
   return li;
 }
 
-function createCategoryDiv(name, color, isRecent = false, isCustom = false) {
+function createCategoryDiv(name, color, textColor, isRecent = false, isCustom = false) {
   const categoryDiv = document.createElement('div');
   categoryDiv.className = 'list-group-item list-group-item-action';
   categoryDiv.style.backgroundColor = color;
+  categoryDiv.style.color = textColor;
 
   categoryDiv.innerHTML = `
     <div class="category-item">${name}</div>
@@ -319,11 +323,11 @@ async function refreshFileList() {
 
 function getCategories() {
   return JSON.parse(localStorage.getItem('categories')) || [
-    { name: 'Images Files', extensions: ['.png', '.jpg', '.jpeg'], color: '#d1e7dd' },
-    { name: 'Blender Files', extensions: ['.blend'], color: '#ffebcc' },
-    { name: 'ZIP Archives', extensions: ['.rar', '.zip', '.tar.gz'], color: '#f5c6cb' },
-    { name: 'Text Files', extensions: ['.txt'], color: '#f4f4f4' },
-    { name: 'Executable Files', extensions: ['.exe'], color: '#cfe2ff' },
+    { name: 'Images Files', extensions: ['.png', '.jpg', '.jpeg'], color: '#d1e7dd', textColor: '#000000' },
+    { name: 'Blender Files', extensions: ['.blend'], color: '#ffebcc', textColor: '#000000' },
+    { name: 'ZIP Archives', extensions: ['.rar', '.zip', '.tar.gz'], color: '#f5c6cb', textColor: '#000000' },
+    { name: 'Text Files', extensions: ['.txt'], color: '#f4f4f4', textColor: '#000000' },
+    { name: 'Executable Files', extensions: ['.exe'], color: '#cfe2ff', textColor: '#000000' },
   ];
 }
 
@@ -343,6 +347,7 @@ function showCategoryModal(category = {}) {
   document.getElementById('category-name').value = category.name || '';
   document.getElementById('category-extensions').value = category.extensions ? category.extensions.join(', ') : '';
   document.getElementById('category-color').value = category.color || '#f4f4f4';
+  document.getElementById('category-text-color').value = category.textColor || '#000000';
   document.getElementById('category-modal').dataset.editing = category.name || '';
   document.getElementById('category-modal').classList.add('show');
   document.getElementById('category-modal').style.display = 'block';
@@ -357,6 +362,7 @@ function saveCategory() {
   const name = document.getElementById('category-name').value.trim();
   const extensions = document.getElementById('category-extensions').value.split(',').map(ext => ext.trim());
   const color = document.getElementById('category-color').value;
+  const textColor = document.getElementById('category-text-color').value;
 
   if (!name || extensions.length === 0) {
     alert('Please provide both a name and at least one extension.');
@@ -367,9 +373,9 @@ function saveCategory() {
   const existingCategoryName = document.getElementById('category-modal').dataset.editing;
   if (existingCategoryName) {
     const existingCategoryIndex = categories.findIndex(category => category.name === existingCategoryName);
-    categories[existingCategoryIndex] = { name, extensions, color };
+    categories[existingCategoryIndex] = { name, extensions, color, textColor };
   } else {
-    categories.push({ name, extensions, color });
+    categories.push({ name, extensions, color, textColor });
   }
 
   saveCategories(categories);
