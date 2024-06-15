@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('toggle-delete-buttons').checked = showDeleteButtons;
 
   if (watchFolder) {
+    window.api.watchFolder(watchFolder);
     const files = await window.api.getFiles(watchFolder, getCategories(), listSubfolders);
     displayFiles(files, getCategories(), listSubfolders);
     updateElementCount(files.all.length);
@@ -19,6 +20,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('toggle-category-buttons').addEventListener('change', () => {
     const showCategoryButtons = document.getElementById('toggle-category-buttons').checked;
     toggleCategoryButtons(showCategoryButtons);
+  });
+
+  window.api.onRefreshFiles(async () => {
+    const folderPath = document.getElementById('selected-folder-path').textContent;
+    const categories = getCategories();
+    const listSubfolders = document.getElementById('list-subfolders').checked;
+    const currentCategory = document.getElementById('current-category-title').textContent;
+
+    const files = await window.api.getFiles(folderPath, categories, listSubfolders);
+    displayFiles(files, categories, listSubfolders);
+
+    if (currentCategory) {
+      const currentFiles = files[currentCategory] || files.all;
+      const currentCategoryData = categories.find(category => category.name === currentCategory);
+      const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
+      const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
+      displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
+    }
+
+    updateElementCount(files.all.length);
   });
 });
 
@@ -32,6 +53,7 @@ document.getElementById('select-folder-btn').addEventListener('click', async () 
     displayFiles(files, categories, listSubfolders);
     saveSettings({ watchFolder: folderPath, categories, listSubfolders, showDeleteButtons: true });
     updateElementCount(files.all.length);
+    window.api.watchFolder(folderPath); // Watch the new folder
   }
 });
 
@@ -61,6 +83,7 @@ async function handleListSubfoldersChange() {
   const categories = getCategories();
   const listSubfolders = listSubfoldersCheckbox.checked;
   const showDeleteButtons = document.getElementById('toggle-delete-buttons').checked;
+  const currentCategory = document.getElementById('current-category-title').textContent;
 
   if (listSubfolders) {
     const files = await window.api.getFiles(watchFolder, categories, true);
@@ -76,6 +99,15 @@ async function handleListSubfoldersChange() {
   saveSettings({ watchFolder, categories, listSubfolders, showDeleteButtons });
   const files = await window.api.getFiles(watchFolder, categories, listSubfolders);
   displayFiles(files, categories, listSubfolders);
+
+  if (currentCategory) {
+    const currentFiles = files[currentCategory] || files.all;
+    const currentCategoryData = categories.find(category => category.name === currentCategory);
+    const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
+    const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
+    displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
+  }
+
   updateElementCount(files.all.length);
 }
 
@@ -96,6 +128,9 @@ async function displayFiles(files, categories, listSubfolders) {
   const categoriesContainer = document.getElementById('categories');
   categoriesContainer.innerHTML = ''; // Clear existing categories
 
+  // Sort files by modification date (newest to oldest)
+  files.all.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+
   const allFilesDiv = createCategoryDiv('All Files', '#f4f4f4', '#000000');
   allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', '#000000', listSubfolders, categories));
   categoriesContainer.appendChild(allFilesDiv);
@@ -111,8 +146,9 @@ async function displayFiles(files, categories, listSubfolders) {
   });
 
   categories.forEach((category, index) => {
+    const categoryFiles = files[category.name].sort((a, b) => new Date(b.mtime) - new Date(a.mtime)); // Sort category files
     const categoryDiv = createCategoryDiv(category.name, category.color, category.textColor, false, true);
-    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, category.textColor, listSubfolders, categories));
+    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, categoryFiles, category.color, category.textColor, listSubfolders, categories));
     categoriesContainer.appendChild(categoryDiv);
     addCategoryButtonsEventListeners(categoryDiv, index, category.name);
   });
@@ -154,7 +190,6 @@ function displayCategoryFiles(categoryName, files, color, textColor, listSubfold
     }
   });
 }
-
 
 async function displayRecentFiles() {
   const recentFiles = await window.api.readRecentFiles();

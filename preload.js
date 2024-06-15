@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('api', {
   confirmLargeListing: (count) => ipcRenderer.invoke('confirm-large-listing', count),
   logFilePath: (filePath) => ipcRenderer.invoke('log-file-path', filePath),
   readRecentFiles: () => ipcRenderer.invoke('read-recent-files'),
-  clearRecentFiles: () => ipcRenderer.invoke('clear-recent-files')
+  clearRecentFiles: () => ipcRenderer.invoke('clear-recent-files'),
+  watchFolder: (folderPath) => ipcRenderer.invoke('watch-folder', folderPath),
+  stopWatching: () => ipcRenderer.invoke('stop-watching'),
+  onRefreshFiles: (callback) => ipcRenderer.on('refresh-files', callback),
 });

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
+let watcher;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -96,12 +97,12 @@ const walkSync = async (dir, listSubfolders, fileList = []) => {
       const filePath = path.join(dir, file);
       const stats = await fs.promises.stat(filePath);
       if (stats.isDirectory()) {
-        fileList.push({ path: filePath, name: file, isDirectory: true });
+        fileList.push({ path: filePath, name: file, isDirectory: true, mtime: stats.mtime });
         if (listSubfolders) {
           await walkSync(filePath, listSubfolders, fileList);
         }
       } else {
-        fileList.push({ path: filePath, name: file, isDirectory: false });
+        fileList.push({ path: filePath, name: file, isDirectory: false, mtime: stats.mtime });
       }
     }
     return fileList;
@@ -110,6 +111,7 @@ const walkSync = async (dir, listSubfolders, fileList = []) => {
     return fileList;
   }
 };
+
 
 ipcMain.handle('get-files', async (event, folderPath, categories, listSubfolders) => {
   try {
@@ -195,5 +197,27 @@ ipcMain.handle('confirm-large-listing', async (event, count) => {
   } catch (error) {
     console.error('Error confirming large listing:', error);
     return false;
+  }
+});
+
+
+
+//watcher
+ipcMain.handle('watch-folder', (event, folderPath) => {
+  if (watcher) {
+    watcher.close();
+  }
+
+  watcher = fs.watch(folderPath, (eventType, filename) => {
+    if (filename) {
+      mainWindow.webContents.send('refresh-files');
+    }
+  });
+});
+
+ipcMain.handle('stop-watching', () => {
+  if (watcher) {
+    watcher.close();
+    watcher = null;
   }
 });
