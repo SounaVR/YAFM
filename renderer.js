@@ -1,3 +1,5 @@
+let allFiles = {};
+
 document.addEventListener('DOMContentLoaded', async () => {
   const settings = await loadSettings();
   const watchFolder = settings?.watchFolder;
@@ -40,6 +42,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     updateElementCount(files.all.length);
+  });
+
+  document.getElementById('search-bar').addEventListener('input', (event) => {
+    const searchTerm = event.target.value.toLowerCase();
+    const currentCategory = document.getElementById('current-category-title').textContent;
+    const categories = getCategories();
+    const listSubfolders = document.getElementById('list-subfolders').checked;
+
+    window.api.getFiles(watchFolder, categories, listSubfolders).then((files) => {
+      const filteredFiles = files[currentCategory].filter(file => file.name.toLowerCase().includes(searchTerm));
+      const currentCategoryData = categories.find(category => category.name === currentCategory);
+      const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
+      const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
+      displayCategoryFiles(currentCategory, filteredFiles, color, textColor, listSubfolders, categories);
+    });
   });
 });
 
@@ -127,6 +144,9 @@ function updateElementCount(count) {
 async function displayFiles(files, categories, listSubfolders) {
   const categoriesContainer = document.getElementById('categories');
   categoriesContainer.innerHTML = ''; // Clear existing categories
+
+  // Save all files for later use in search
+  allFiles = files;
 
   // Sort files by modification date (newest to oldest)
   files.all.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
@@ -485,3 +505,17 @@ function toggleDeleteButtons(show) {
     btn.style.display = show ? 'inline-block' : 'none';
   });
 }
+
+document.getElementById('search-bar').addEventListener('input', (event) => {
+  const searchTerm = event.target.value.toLowerCase();
+  const currentCategory = document.getElementById('current-category-title').textContent;
+  const categories = getCategories();
+  const listSubfolders = document.getElementById('list-subfolders').checked;
+
+  const files = allFiles[currentCategory] || allFiles.all;
+  const filteredFiles = files.filter(file => file.name.toLowerCase().includes(searchTerm));
+  const currentCategoryData = categories.find(category => category.name === currentCategory);
+  const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
+  const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
+  displayCategoryFiles(currentCategory, filteredFiles, color, textColor, listSubfolders, categories);
+});

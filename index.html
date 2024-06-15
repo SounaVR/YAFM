@@ -62,6 +62,9 @@
       background-color: var(--dynamic-bg-color) !important;
       color: var(--dynamic-text-color) !important;
     }
+    #search-bar {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -91,6 +94,7 @@
       <span id="selected-folder-path" class="ml-2"></span>
       <span id="element-count" class="badge badge-secondary"></span>
     </div>
+    <input type="text" id="search-bar" placeholder="Search files..." />
     <ul id="current-files" class="file-list">
       <!-- Files will be injected here based on the selected category -->
     </ul>
