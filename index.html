@@ -62,14 +62,22 @@
 </head>
 <body>
   <div id="sidebar" class="bg-light">
-    <h2>Categories</h2>
     <button id="add-category-btn" class="btn btn-primary mb-3">Add Category</button>
+    <div id="categories" class="list-group">
+      <!-- Dynamic categories will be injected here -->
+    </div>
+    <br />
     <div class="form-check mb-3">
       <input type="checkbox" class="form-check-input" id="toggle-category-buttons">
       <label for="toggle-category-buttons" class="form-check-label">Show category buttons</label>
     </div>
-    <div id="categories" class="list-group">
-      <!-- Dynamic categories will be injected here -->
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="list-subfolders" checked>
+      <label for="list-subfolders" class="form-check-label">List all subfolders</label>
+    </div>
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="toggle-delete-buttons" checked>
+      <label for="toggle-delete-buttons" class="form-check-label">Show delete buttons</label>
     </div>
   </div>
   <div id="main-content">
@@ -80,14 +88,6 @@
     <div class="my-3">
       <button id="select-folder-btn" class="btn btn-info">Select Folder</button>
       <span id="selected-folder-path" class="ml-2"></span>
-    </div>
-    <div class="form-check mb-3">
-      <input type="checkbox" class="form-check-input" id="list-subfolders" checked>
-      <label for="list-subfolders" class="form-check-label">List all subfolders</label>
-    </div>
-    <div class="form-check mb-3">
-      <input type="checkbox" class="form-check-input" id="toggle-delete-buttons" checked>
-      <label for="toggle-delete-buttons" class="form-check-label">Show delete buttons</label>
     </div>
     <ul id="current-files" class="file-list">
       <!-- Files will be injected here based on the selected category -->

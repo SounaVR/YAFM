@@ -12,7 +12,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       enableRemoteModule: false,
-    }
+    },
+    autoHideMenuBar: true,
   });
 
   mainWindow.loadFile('index.html');
