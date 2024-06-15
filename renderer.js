@@ -97,7 +97,7 @@ async function displayFiles(files, categories, listSubfolders) {
   categoriesContainer.innerHTML = ''; // Clear existing categories
 
   const allFilesDiv = createCategoryDiv('All Files', '#f4f4f4');
-  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders));
+  allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders, categories));
   categoriesContainer.appendChild(allFilesDiv);
 
   const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', true);
@@ -112,7 +112,7 @@ async function displayFiles(files, categories, listSubfolders) {
 
   categories.forEach((category, index) => {
     const categoryDiv = createCategoryDiv(category.name, category.color, false, true);
-    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, listSubfolders));
+    categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, files[category.name], category.color, listSubfolders, categories));
     categoriesContainer.appendChild(categoryDiv);
     addCategoryButtonsEventListeners(categoryDiv, index, category.name);
   });
@@ -120,11 +120,12 @@ async function displayFiles(files, categories, listSubfolders) {
   toggleCategoryButtons(document.getElementById('toggle-category-buttons').checked);
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 
-  displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders);
+  displayCategoryFiles('All Files', files.all, '#f4f4f4', listSubfolders, categories);
 }
 
 async function displayRecentFiles() {
   const recentFiles = await window.api.readRecentFiles();
+  const categories = getCategories(); // Get the categories
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = 'Recent Files';
   categoryTitle.style.backgroundColor = '#f4f4f4';
@@ -133,8 +134,14 @@ async function displayRecentFiles() {
   fileList.innerHTML = '';
 
   recentFiles.forEach(filePath => {
+    const fileCategory = categories.find(category =>
+      category.extensions.some(ext => filePath.endsWith(ext))
+    );
+    const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default color if no category matches
+
     const li = document.createElement('li');
-    li.className = 'align-items-center';
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.style.backgroundColor = color; // Apply the category color
 
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = '🗑️';
@@ -170,7 +177,7 @@ async function displayRecentFiles() {
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
-function displayCategoryFiles(categoryName, files, color, listSubfolders) {
+function displayCategoryFiles(categoryName, files, color, listSubfolders, categories) {
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = categoryName;
   categoryTitle.style.backgroundColor = color;
@@ -179,16 +186,23 @@ function displayCategoryFiles(categoryName, files, color, listSubfolders) {
   fileList.innerHTML = '';
 
   files.forEach(file => {
-    const li = createFileElement(file, listSubfolders);
+    const li = createFileElement(file, listSubfolders, categories);
     fileList.appendChild(li);
   });
 
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
 
-function createFileElement(file, listSubfolders) {
+function createFileElement(file, listSubfolders, categories) {
   const li = document.createElement('li');
   li.className = 'align-items-center';
+
+  // Determine the color based on file category
+  const fileCategory = categories.find(category =>
+    category.extensions.some(ext => file.path.endsWith(ext))
+  );
+  const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default color if no category matches
+  li.style.backgroundColor = color;
 
   const deleteBtn = document.createElement('button');
   deleteBtn.textContent = '🗑️';
@@ -223,7 +237,7 @@ function createFileElement(file, listSubfolders) {
         subFilesList = document.createElement('ul');
         subFilesList.className = 'list-group ml-3';
         subFiles.all.forEach(subFile => {
-          const subLi = createFileElement(subFile, listSubfolders);
+          const subLi = createFileElement(subFile, listSubfolders, categories); // Pass the categories
           subFilesList.appendChild(subLi);
         });
         li.appendChild(subFilesList);
@@ -305,11 +319,11 @@ async function refreshFileList() {
 
 function getCategories() {
   return JSON.parse(localStorage.getItem('categories')) || [
-    { name: 'Images Files', extensions: ['.png', '.jpg', '.jpeg'], color: '#f4f4f4' },
-    { name: 'Blender Files', extensions: ['.blend'], color: '#f4f4f4' },
-    { name: 'ZIP Archives', extensions: ['.rar', '.zip', '.tar.gz'], color: '#f4f4f4' },
+    { name: 'Images Files', extensions: ['.png', '.jpg', '.jpeg'], color: '#d1e7dd' },
+    { name: 'Blender Files', extensions: ['.blend'], color: '#ffebcc' },
+    { name: 'ZIP Archives', extensions: ['.rar', '.zip', '.tar.gz'], color: '#f5c6cb' },
     { name: 'Text Files', extensions: ['.txt'], color: '#f4f4f4' },
-    { name: 'Executable Files', extensions: ['.exe'], color: '#f4f4f4' },
+    { name: 'Executable Files', extensions: ['.exe'], color: '#cfe2ff' },
   ];
 }
 
