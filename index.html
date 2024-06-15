@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Manager</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self';">
+  <!-- Bootstrap CSS -->
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <!-- jQuery and Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <style>
+    body {
+      display: flex;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+    }
+    #sidebar {
+      width: 250px;
+      background-color: #f4f4f4;
+      border-right: 1px solid #ccc;
+      padding: 10px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+    }
+    #main-content {
+      margin-left: 250px;
+      padding: 20px;
+      box-sizing: border-box;
+      flex: 1;
+      overflow-y: auto;
+      height: 100vh;
+    }
+    .category-item {
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 3px;
+    }
+    .category-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      display: none; /* Initially hide */
+    }
+    .file-list {
+      padding: 0;
+    }
+    .file-list li {
+      padding: 5px 0;
+      align-items: center;
+    }
+    .file-list li button {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar" class="bg-light">
+    <h2>Categories</h2>
+    <button id="add-category-btn" class="btn btn-primary mb-3">Add Category</button>
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="toggle-category-buttons">
+      <label for="toggle-category-buttons" class="form-check-label">Show category buttons</label>
+    </div>
+    <div id="categories" class="list-group">
+      <!-- Dynamic categories will be injected here -->
+    </div>
+  </div>
+  <div id="main-content">
+    <h1 id="current-category-title" class="bg-secondary text-white p-3">File Manager</h1>
+    <div>
+      <span id="element-count" class="badge badge-secondary"></span>
+    </div>
+    <div class="my-3">
+      <button id="select-folder-btn" class="btn btn-info">Select Folder</button>
+      <span id="selected-folder-path" class="ml-2"></span>
+    </div>
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="list-subfolders" checked>
+      <label for="list-subfolders" class="form-check-label">List all subfolders</label>
+    </div>
+    <div class="form-check mb-3">
+      <input type="checkbox" class="form-check-input" id="toggle-delete-buttons" checked>
+      <label for="toggle-delete-buttons" class="form-check-label">Show delete buttons</label>
+    </div>
+    <ul id="current-files" class="file-list">
+      <!-- Files will be injected here based on the selected category -->
+    </ul>
+  </div>
+
+  <!-- Modal for Adding/Editing Categories -->
+  <div id="category-modal" class="modal fade" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Category</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="category-name">Category Name</label>
+            <input type="text" id="category-name" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="category-extensions">Extensions (comma-separated)</label>
+            <input type="text" id="category-extensions" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="category-color">Category Color</label>
+            <input type="color" id="category-color" class="form-control" value="#f4f4f4">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-category-btn" class="btn btn-primary">Save</button>
+          <button id="cancel-category-btn" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS and dependencies -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

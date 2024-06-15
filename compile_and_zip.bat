@@ -1,0 +1,1 @@
+electron-packager . --platform=win32 --arch=x64 --overwrite & rar a -r File_Manager_v1.0.0.zip File_Manager-win32-x64
