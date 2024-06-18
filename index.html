@@ -137,9 +137,16 @@
   <div id="main-content">
     <h3 id="current-category-title" class="bg-secondary text-white p-3">File Manager</h3>
     <div class="my-3">
-      <button id="select-folder-btn" class="btn btn-info">Select Folder</button>
-      <span id="selected-folder-path" class="ml-2"></span>
+      <button id="add-folder-btn" class="btn btn-primary">Add Folder</button>
+      <button id="select-folder-btn" class="btn btn-info">Select Folders</button>
+      <span id="selected-folder-path" class="ml-2" style="display: none;"></span>
       <span id="element-count" class="badge badge-secondary"></span>
+    </div>
+    <div class="my-3">
+      <h5>Watched Folders:</h5>
+      <ul id="watched-folders-list" class="list-group">
+        <!-- Dynamic list of watched folders will be injected here -->
+      </ul>
     </div>
     <input type="text" id="search-bar" placeholder="Search files..." />
     <ul id="current-files" class="file-list">

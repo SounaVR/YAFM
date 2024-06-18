@@ -94,41 +94,50 @@ ipcMain.handle('clear-recent-files', async () => {
 
 ipcMain.handle('select-folder', async () => {
   try {
-    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return result.filePaths[0];
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'multiSelections'] });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return result.filePaths;
   } catch (error) {
     console.error('Error selecting folder:', error);
-    return null;
+    return [];
   }
 });
 
-const walkSync = async (dir, listSubfolders, fileList = []) => {
-  try {
-    const files = await fs.promises.readdir(dir);
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stats = await fs.promises.stat(filePath);
-      if (stats.isDirectory()) {
-        fileList.push({ path: filePath, name: file, isDirectory: true, mtime: stats.mtime });
-        if (listSubfolders) {
-          await walkSync(filePath, listSubfolders, fileList);
-        }
-      } else {
-        fileList.push({ path: filePath, name: file, isDirectory: false, mtime: stats.mtime });
-      }
-    }
-    return fileList;
-  } catch (error) {
-    console.error('Error walking through directory:', error);
-    return fileList;
+const walkSync = async (dirs, listSubfolders, fileList = []) => {
+  if (!Array.isArray(dirs)) {
+    dirs = [dirs];
   }
+
+  for (const dir of dirs) {
+    try {
+      const files = await fs.promises.readdir(dir);
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stats = await fs.promises.stat(filePath);
+        if (stats.isDirectory()) {
+          fileList.push({ path: filePath, name: file, isDirectory: true, mtime: stats.mtime });
+          if (listSubfolders) {
+            await walkSync(filePath, listSubfolders, fileList);
+          }
+        } else {
+          fileList.push({ path: filePath, name: file, isDirectory: false, mtime: stats.mtime });
+        }
+      }
+    } catch (error) {
+      console.error('Error walking through directory:', error);
+    }
+  }
+
+  return fileList;
 };
 
+ipcMain.handle('get-files', async (event, folderPaths, categories, listSubfolders) => {
+  if (!Array.isArray(folderPaths)) {
+    folderPaths = [folderPaths];
+  }
 
-ipcMain.handle('get-files', async (event, folderPath, categories, listSubfolders) => {
   try {
-    const allFiles = await walkSync(folderPath, listSubfolders);
+    const allFiles = await walkSync(folderPaths, listSubfolders);
     const recentFiles = await readRecentFiles();
     const categorizedFiles = { all: allFiles, recent: recentFiles };
 
@@ -216,16 +225,28 @@ ipcMain.handle('confirm-large-listing', async (event, count) => {
 
 
 //watcher
-ipcMain.handle('watch-folder', (event, folderPath) => {
+ipcMain.handle('watch-folder', (event, folderPaths) => {
+  if (!Array.isArray(folderPaths)) {
+    folderPaths = [folderPaths];
+  }
+
   if (watcher) {
     watcher.close();
   }
 
-  watcher = fs.watch(folderPath, (eventType, filename) => {
+  watcher = fs.watch(folderPaths[0], { recursive: true }, (eventType, filename) => {
     if (filename) {
       mainWindow.webContents.send('refresh-files');
     }
   });
+
+  for (const folderPath of folderPaths.slice(1)) {
+    fs.watch(folderPath, { recursive: true }, (eventType, filename) => {
+      if (filename) {
+        mainWindow.webContents.send('refresh-files');
+      }
+    });
+  }
 });
 
 ipcMain.handle('stop-watching', () => {

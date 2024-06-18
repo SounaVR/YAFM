@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
-  getFiles: (folderPath, categories, listSubfolders) => ipcRenderer.invoke('get-files', folderPath, categories, listSubfolders),
+  getFiles: (folderPaths, categories, listSubfolders) => ipcRenderer.invoke('get-files', folderPaths, categories, listSubfolders),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   deleteFile: (filePath) => ipcRenderer.invoke('delete-file', filePath),
   openLocation: (filePath) => ipcRenderer.invoke('open-location', filePath),
@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   logFilePath: (filePath) => ipcRenderer.invoke('log-file-path', filePath),
   readRecentFiles: () => ipcRenderer.invoke('read-recent-files'),
   clearRecentFiles: () => ipcRenderer.invoke('clear-recent-files'),
-  watchFolder: (folderPath) => ipcRenderer.invoke('watch-folder', folderPath),
+  watchFolder: (folderPaths) => ipcRenderer.invoke('watch-folder', folderPaths),
   stopWatching: () => ipcRenderer.invoke('stop-watching'),
   onRefreshFiles: (callback) => ipcRenderer.on('refresh-files', callback),
   openRecycleBin: () => ipcRenderer.invoke('open-recycle-bin')

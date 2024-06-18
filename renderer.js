@@ -1,4 +1,5 @@
 let allFiles = {};
+let currentCategory = 'All Files';
 const extensionIcons = {
   '.png': './icons/png.png',
   '.jpg': './icons/jpeg.png',
@@ -19,22 +20,68 @@ const extensionIcons = {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const settings = await loadSettings();
-  const watchFolder = settings?.watchFolder;
+  const watchFolders = settings?.watchFolders || [];
   const listSubfolders = settings?.listSubfolders || false;
   const showDeleteButtons = settings?.showDeleteButtons || false;
 
-  document.getElementById('selected-folder-path').textContent = watchFolder || '';
+  document.getElementById('selected-folder-path').textContent = watchFolders.join(', ') || '';
   document.getElementById('list-subfolders').checked = listSubfolders;
   document.getElementById('toggle-delete-buttons').checked = showDeleteButtons;
 
-  if (watchFolder) {
-    window.api.watchFolder(watchFolder);
-    const files = await window.api.getFiles(watchFolder, getCategories(), listSubfolders);
+  if (watchFolders.length > 0) {
+    window.api.watchFolder(watchFolders);
+    const files = await window.api.getFiles(watchFolders, getCategories(), listSubfolders);
     displayFiles(files, getCategories(), listSubfolders);
     updateElementCount(files.all.length);
   }
 
   toggleDeleteButtons(showDeleteButtons);
+
+  document.getElementById('add-folder-btn').addEventListener('click', async () => {
+    const folderPaths = await window.api.selectFolder();
+    if (folderPaths.length > 0) {
+      const currentFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
+      const updatedFolders = [...new Set([...currentFolders, ...folderPaths])]; // Remove duplicates
+      updateWatchedFoldersList(updatedFolders);
+      const categories = getCategories();
+      const listSubfolders = document.getElementById('list-subfolders').checked;
+      const files = await window.api.getFiles(updatedFolders, categories, listSubfolders);
+      displayFiles(files, categories, listSubfolders);
+      saveSettings({
+        watchFolders: updatedFolders,
+        categories,
+        listSubfolders,
+        showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
+      });
+      updateElementCount(files.all.length);
+      window.api.watchFolder(updatedFolders); // Watch the new folders
+
+      // Ensure the current category is displayed
+      displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', listSubfolders, categories);
+    }
+  });
+
+  document.getElementById('select-folder-btn').addEventListener('click', async () => {
+    const folderPaths = await window.api.selectFolder();
+    if (folderPaths.length > 0) {
+      updateWatchedFoldersList(folderPaths);
+      const categories = getCategories();
+      const listSubfolders = document.getElementById('list-subfolders').checked;
+      const files = await window.api.getFiles(folderPaths, categories, listSubfolders);
+      displayFiles(files, categories, listSubfolders);
+      saveSettings({
+        watchFolders: folderPaths,
+        categories,
+        listSubfolders,
+        showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
+      });
+      updateElementCount(files.all.length);
+      window.api.watchFolder(folderPaths); // Watch the new folders
+
+      // Ensure the current category is displayed
+      displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', listSubfolders, categories);
+    }
+  });
 
   document.getElementById('toggle-category-buttons').addEventListener('change', () => {
     const showCategoryButtons = document.getElementById('toggle-category-buttons').checked;
@@ -239,19 +286,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     return li;
   };
-});
 
-document.getElementById('select-folder-btn').addEventListener('click', async () => {
-  const folderPath = await window.api.selectFolder();
-  if (folderPath) {
-    document.getElementById('selected-folder-path').textContent = folderPath;
-    const categories = getCategories();
-    const listSubfolders = document.getElementById('list-subfolders').checked;
-    const files = await window.api.getFiles(folderPath, categories, listSubfolders);
-    displayFiles(files, categories, listSubfolders);
-    saveSettings({ watchFolder: folderPath, categories, listSubfolders, showDeleteButtons: true });
-    updateElementCount(files.all.length);
-    window.api.watchFolder(folderPath); // Watch the new folder
+  function updateWatchedFoldersList(watchFolders) {
+    const watchedFoldersList = document.getElementById('watched-folders-list');
+    watchedFoldersList.innerHTML = '';
+
+    watchFolders.forEach((folderPath, index) => {
+      const listItem = document.createElement('li');
+      listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+      listItem.textContent = folderPath;
+
+      const removeButton = document.createElement('button');
+      removeButton.className = 'btn btn-danger btn-sm';
+      removeButton.textContent = 'Remove';
+      removeButton.addEventListener('click', () => {
+        watchFolders.splice(index, 1);
+        updateWatchedFoldersList(watchFolders);
+        saveSettings({
+          watchFolders,
+          categories: getCategories(),
+          listSubfolders: document.getElementById('list-subfolders').checked,
+          showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
+        });
+        window.api.watchFolder(watchFolders); // Update the watched folders
+        refreshFileList();
+      });
+
+      listItem.appendChild(removeButton);
+      watchedFoldersList.appendChild(listItem);
+    });
+
+    document.getElementById('selected-folder-path').textContent = watchFolders.join(', ');
   }
 });
 
@@ -364,6 +429,8 @@ async function displayFiles(files, categories, listSubfolders) {
 }
 
 function displayCategoryFiles(categoryName, files, color, textColor, listSubfolders, categories) {
+  currentCategory = categoryName; // Set the current category
+
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = categoryName;
 
@@ -480,7 +547,8 @@ async function saveSettings(settings) {
 }
 
 async function loadSettings() {
-  return await window.api.loadSettings();
+  const settings = await window.api.loadSettings();
+  return settings ? { ...settings, watchFolders: settings.watchFolders || [] } : {};
 }
 
 function showCategoryModal(category = {}) {
