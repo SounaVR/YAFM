@@ -539,7 +539,7 @@ function saveCategory() {
 
   saveCategories(categories);
   hideCategoryModal();
-  refreshFileList();
+  refreshCategoryList();
 }
 
 function editCategory(name) {
@@ -557,7 +557,19 @@ function deleteCategory(name) {
     const updatedCategories = categories.filter(category => category.name !== name);
 
     saveCategories(updatedCategories);
-    refreshFileList();
+    refreshCategoryList();
+  }
+}
+
+function refreshCategoryList() {
+  const watchFolder = document.getElementById('selected-folder-path').textContent;
+  const listSubfolders = document.getElementById('list-subfolders').checked;
+  const categories = getCategories();
+  if (watchFolder) {
+    window.api.getFiles(watchFolder, categories, listSubfolders).then(files => {
+      displayFiles(files, categories, listSubfolders);
+      updateElementCount(files.all.length);
+    });
   }
 }
 
