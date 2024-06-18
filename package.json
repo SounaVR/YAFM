@@ -1,12 +1,12 @@
 {
-  "name": "file-manager",
+  "name": "YAFM",
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
   },
   "keywords": [],
-  "author": "",
+  "author": "SounaVR",
   "license": "ISC",
   "description": "",
   "devDependencies": {

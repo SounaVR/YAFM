@@ -1,1 +1,1 @@
-electron-packager . --platform=win32 --arch=x64 --overwrite & rar a -r file-manager-win32-x64.zip file-manager-win32-x64
+electron-packager . --platform=win32 --arch=x64 --overwrite & rar a -r yafm-win32-x64.zip yafm-win32-x64
