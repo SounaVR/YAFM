@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -59,7 +60,19 @@ async function readRecentFiles() {
   try {
     await ensureLogFileExists();
     const data = await fs.promises.readFile(logFilePath, 'utf8');
-    return data.split('\n').filter(line => line.trim() !== '');
+    const recentFilePaths = data.split('\n').filter(line => line.trim() !== '');
+    const recentFiles = [];
+
+    for (const filePath of recentFilePaths) {
+      try {
+        const stats = await fs.promises.stat(filePath);
+        recentFiles.push({ path: filePath, name: path.basename(filePath), isDirectory: stats.isDirectory(), mtime: stats.mtime });
+      } catch (err) {
+        console.error('Error getting file stats:', err);
+      }
+    }
+
+    return recentFiles;
   } catch (error) {
     console.error('Error reading recent files:', error);
     return [];
@@ -219,5 +232,15 @@ ipcMain.handle('stop-watching', () => {
   if (watcher) {
     watcher.close();
     watcher = null;
+  }
+});
+
+ipcMain.handle('open-recycle-bin', async () => {
+  try {
+    exec('explorer.exe shell:RecycleBinFolder');
+    return true;
+  } catch (error) {
+    console.error('Error opening Recycle Bin:', error);
+    return false;
   }
 });

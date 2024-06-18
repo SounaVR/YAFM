@@ -15,4 +15,5 @@ contextBridge.exposeInMainWorld('api', {
   watchFolder: (folderPath) => ipcRenderer.invoke('watch-folder', folderPath),
   stopWatching: () => ipcRenderer.invoke('stop-watching'),
   onRefreshFiles: (callback) => ipcRenderer.on('refresh-files', callback),
+  openRecycleBin: () => ipcRenderer.invoke('open-recycle-bin')
 });

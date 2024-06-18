@@ -145,6 +145,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Open Recycle Bin button handler
+  document.getElementById('open-recycle-bin-btn').addEventListener('click', async () => {
+    const success = await window.api.openRecycleBin();
+    if (!success) {
+      alert('Failed to open Recycle Bin.');
+    }
+  });
+
   window.createFileElement = function createFileElement(file, listSubfolders, categories) {
     const li = document.createElement('li');
 
@@ -172,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     deleteBtn.style.display = 'none';
     deleteBtn.addEventListener('click', async (event) => {
       event.stopPropagation();
-      if (confirm(`Are you sure you want to delete the file: ${file.name}?`)) {
+      if (confirm(`Are you sure you want to send "${file.name}" to the Recycle Bin ?`)) {
         const success = await window.api.deleteFile(file.path);
         if (success) {
           const currentCategory = document.getElementById('current-category-title').textContent;
@@ -329,7 +337,7 @@ async function displayFiles(files, categories, listSubfolders) {
   categoriesContainer.appendChild(allFilesDiv);
 
   const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', '#000000', true);
-  recentFilesDiv.addEventListener('click', () => displayCategoryFiles('Recent Files', files.recent, '#f4f4f4', '#000000', listSubfolders, categories));
+  recentFilesDiv.addEventListener('click', () => displayRecentFiles());
   categoriesContainer.appendChild(recentFilesDiv);
 
   document.getElementById('clear-recent-files-btn').addEventListener('click', async (event) => {
@@ -397,49 +405,22 @@ async function displayRecentFiles() {
   const fileList = document.getElementById('current-files');
   fileList.innerHTML = '';
 
-  recentFiles.forEach(filePath => {
+  recentFiles.forEach(file => {
     const fileCategory = categories.find(category =>
-      category.extensions.some(ext => filePath.endsWith(ext))
+      category.extensions.some(ext => file.path.endsWith(ext))
     );
     const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default color if no category matches
+    const textColor = fileCategory ? fileCategory.textColor : '#000000';
 
-    const li = document.createElement('li');
-    li.className = 'align-items-center';
-    li.style.backgroundColor = color; // Apply the category color
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.className = 'btn btn-danger btn-sm delete-button';
-    deleteBtn.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (confirm(`Are you sure you want to delete the file: ${filePath}?`)) {
-        const success = await window.api.deleteFile(filePath);
-        if (success) {
-          displayRecentFiles();
-        }
-      }
-    });
-
-    li.appendChild(deleteBtn);
-
-    li.appendChild(document.createTextNode(filePath));
-
-    li.addEventListener('click', async () => {
-      await window.api.logFilePath(filePath);
-      window.api.openFile(filePath);
-    });
-
-    li.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      window.api.openLocation(filePath);
-    });
-
+    const li = createFileElement(file, false, categories);
     fileList.appendChild(li);
   });
 
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
+
+// Add event listener to a button to trigger displaying recent files
+document.getElementById('show-recent-files-btn').addEventListener('click', displayRecentFiles);
 
 function createCategoryDiv(name, color, textColor, isRecent = false, isCustom = false) {
   const categoryDiv = document.createElement('div');
