@@ -106,6 +106,12 @@
       text-decoration: none;
       cursor: pointer;
     }
+    .hidden {
+      display: none;
+    }
+    .visible {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -140,9 +146,10 @@
       <button id="add-folder-btn" class="btn btn-primary">Add Folder</button>
       <button id="select-folder-btn" class="btn btn-info">Select Folders</button>
       <span id="selected-folder-path" class="ml-2" style="display: none;"></span>
+      <button id="toggle-watched-folders-btn" class="btn btn-secondary ml-2">Show Watched Folders</button>
       <span id="element-count" class="badge badge-secondary"></span>
     </div>
-    <div class="my-3">
+    <div id="watched-folders-container" class="my-3" style="display: none;">
       <h5>Watched Folders:</h5>
       <ul id="watched-folders-list" class="list-group">
         <!-- Dynamic list of watched folders will be injected here -->

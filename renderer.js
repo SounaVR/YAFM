@@ -83,6 +83,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  document.getElementById('toggle-watched-folders-btn').addEventListener('click', () => {
+    const container = document.getElementById('watched-folders-container');
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+      document.getElementById('toggle-watched-folders-btn').textContent = 'Hide Watched Folders';
+    } else {
+      container.style.display = 'none';
+      document.getElementById('toggle-watched-folders-btn').textContent = 'Show Watched Folders';
+    }
+  });
+
   document.getElementById('toggle-category-buttons').addEventListener('change', () => {
     const showCategoryButtons = document.getElementById('toggle-category-buttons').checked;
     toggleCategoryButtons(showCategoryButtons);
@@ -299,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const removeButton = document.createElement('button');
       removeButton.className = 'btn btn-danger btn-sm';
       removeButton.textContent = 'Remove';
-      removeButton.addEventListener('click', () => {
+      removeButton.addEventListener('click', async () => {
         watchFolders.splice(index, 1);
         updateWatchedFoldersList(watchFolders);
         saveSettings({
@@ -308,8 +319,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           listSubfolders: document.getElementById('list-subfolders').checked,
           showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
         });
+        const files = await window.api.getFiles(watchFolders, getCategories(), document.getElementById('list-subfolders').checked);
+        displayFiles(files, getCategories(), document.getElementById('list-subfolders').checked);
         window.api.watchFolder(watchFolders); // Update the watched folders
-        refreshFileList();
+
+        // Ensure the current category is displayed
+        displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', document.getElementById('list-subfolders').checked, getCategories());
       });
 
       listItem.appendChild(removeButton);
