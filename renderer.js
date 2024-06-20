@@ -1,5 +1,6 @@
 let allFiles = {};
 let currentCategory = 'All Files';
+const iconMappings = JSON.parse(localStorage.getItem('iconMappings')) || {};
 const extensionIcons = {
   '.png': './icons/png.png',
   '.jpg': './icons/jpeg.png',
@@ -17,6 +18,93 @@ const extensionIcons = {
   '.bat': './icons/bat.png',
   'folder': './icons/folder.png'
 };
+
+// Define createFileElement in the global scope
+window.createFileElement = function createFileElement(file, listSubfolders, categories) {
+  const li = document.createElement('li');
+
+  // Determine the color and text color based on file category
+  const fileCategory = categories.find(category =>
+    category.extensions.some(ext => file.path.endsWith(ext))
+  );
+  const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default background color if no category matches
+  const textColor = fileCategory ? fileCategory.textColor : '#000000'; // Default text color if no category matches
+  li.style.backgroundColor = color;
+  li.style.color = textColor;
+
+  // Get the appropriate icon path
+  const fileExtension = file.isDirectory ? 'folder' : `.${file.path.split('.').pop()}`;
+  const iconPath = iconMappings[fileExtension] || extensionIcons[fileExtension] || './icons/default-icon.png'; // Default icon if no match
+
+  const iconImg = document.createElement('img');
+  iconImg.src = iconPath;
+  iconImg.alt = fileExtension;
+  iconImg.className = 'file-icon mr-2'; // Add appropriate styling in your CSS
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn btn-danger btn-sm delete-button mr-2';
+  deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; // Ensure the icon HTML is correct
+  deleteBtn.style.display = 'none';
+  deleteBtn.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (confirm(`Are you sure you want to send "${file.name}" to the Recycle Bin ?`)) {
+      const success = await window.api.deleteFile(file.path);
+      if (success) {
+        await refreshFileList();
+      }
+    }
+  });
+
+  if (file.isDirectory && !listSubfolders) {
+    const dropdownBtn = document.createElement('button');
+    dropdownBtn.innerHTML = '&#x25BC;'; // Unicode for down arrow
+    dropdownBtn.className = 'btn btn-secondary btn-sm mr-2';
+    let isOpen = false;
+    let subFilesList;
+
+    dropdownBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      if (isOpen) {
+        subFilesList.remove();
+        isOpen = false;
+        dropdownBtn.innerHTML = '&#x25BC;'; // Down arrow
+      } else {
+        const subFiles = await window.api.getFiles(file.path, getCategories(), false);
+        subFilesList = document.createElement('ul');
+        subFilesList.className = 'list-group ml-3';
+        subFiles.all.forEach(subFile => {
+          const subLi = createFileElement(subFile, listSubfolders, categories); // Pass the categories
+          subFilesList.appendChild(subLi);
+        });
+        li.appendChild(subFilesList);
+        isOpen = true;
+        dropdownBtn.innerHTML = '&#x25B2;'; // Up arrow
+
+        toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
+      }
+    });
+    li.appendChild(dropdownBtn);
+  }
+
+  li.appendChild(deleteBtn); // Add the delete button
+  li.appendChild(iconImg); // Add the icon before the file name
+  li.appendChild(document.createTextNode(file.name));
+
+  li.addEventListener('click', async () => {
+    if (!file.isDirectory) {
+      await window.api.logFilePath(file.path);
+      window.api.openFile(file.path);
+    }
+  });
+
+  li.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.api.openLocation(file.path);
+  });
+
+  return li;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const settings = await loadSettings();
@@ -41,23 +129,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const folderPaths = await window.api.selectFolder();
     if (folderPaths.length > 0) {
       const currentFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
-      const updatedFolders = [...new Set([...currentFolders, ...folderPaths])]; // Remove duplicates
+      const updatedFolders = [...new Set([...currentFolders, ...folderPaths])];
       updateWatchedFoldersList(updatedFolders);
-      const categories = getCategories();
-      const listSubfolders = document.getElementById('list-subfolders').checked;
-      const files = await window.api.getFiles(updatedFolders, categories, listSubfolders);
-      displayFiles(files, categories, listSubfolders);
       saveSettings({
         watchFolders: updatedFolders,
-        categories,
-        listSubfolders,
+        categories: getCategories(),
+        listSubfolders: document.getElementById('list-subfolders').checked,
         showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
       });
-      updateElementCount(files.all.length);
-      window.api.watchFolder(updatedFolders); // Watch the new folders
-
-      // Ensure the current category is displayed
-      displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', listSubfolders, categories);
+      window.api.watchFolder(updatedFolders);
+      await refreshFileList();
     }
   });
 
@@ -65,21 +146,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const folderPaths = await window.api.selectFolder();
     if (folderPaths.length > 0) {
       updateWatchedFoldersList(folderPaths);
-      const categories = getCategories();
-      const listSubfolders = document.getElementById('list-subfolders').checked;
-      const files = await window.api.getFiles(folderPaths, categories, listSubfolders);
-      displayFiles(files, categories, listSubfolders);
       saveSettings({
         watchFolders: folderPaths,
-        categories,
-        listSubfolders,
+        categories: getCategories(),
+        listSubfolders: document.getElementById('list-subfolders').checked,
         showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
       });
-      updateElementCount(files.all.length);
-      window.api.watchFolder(folderPaths); // Watch the new folders
-
-      // Ensure the current category is displayed
-      displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', listSubfolders, categories);
+      window.api.watchFolder(folderPaths);
+      await refreshFileList();
     }
   });
 
@@ -94,29 +168,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  document.getElementById('add-icon-btn').addEventListener('click', () => {
+    const iconModal = document.getElementById('icon-modal');
+    iconModal.classList.add('show');
+    iconModal.style.display = 'block';
+  });
+
   document.getElementById('toggle-category-buttons').addEventListener('change', () => {
     const showCategoryButtons = document.getElementById('toggle-category-buttons').checked;
     toggleCategoryButtons(showCategoryButtons);
   });
 
   window.api.onRefreshFiles(async () => {
-    const folderPath = document.getElementById('selected-folder-path').textContent;
-    const categories = getCategories();
-    const listSubfolders = document.getElementById('list-subfolders').checked;
-    const currentCategory = document.getElementById('current-category-title').textContent;
-
-    const files = await window.api.getFiles(folderPath, categories, listSubfolders);
-    displayFiles(files, categories, listSubfolders);
-
-    if (currentCategory) {
-      const currentFiles = files[currentCategory] || files.all;
-      const currentCategoryData = categories.find(category => category.name === currentCategory);
-      const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
-      const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
-      displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
-    }
-
-    updateElementCount(files.all.length);
+    await refreshFileList();
   });
 
   document.getElementById('search-bar').addEventListener('input', (event) => {
@@ -140,17 +204,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Icon modal and form handling
-  const iconMappings = JSON.parse(localStorage.getItem('iconMappings')) || {};
-
   const iconModal = document.getElementById('icon-modal');
-  const addIconBtn = document.getElementById('add-icon-btn');
   const iconForm = document.getElementById('icon-form');
   const closeIconModalBtn = iconModal.querySelector('.close');
-
-  addIconBtn.addEventListener('click', () => {
-    iconModal.classList.add('show');
-    iconModal.style.display = 'block';
-  });
 
   closeIconModalBtn.addEventListener('click', () => {
     iconModal.classList.remove('show');
@@ -164,44 +220,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  iconForm.addEventListener('submit', (event) => {
+  iconForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const extension = document.getElementById('extension').value.trim();
     const iconFile = document.getElementById('icon-file').files[0];
 
     if (extension && iconFile) {
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         iconMappings[extension] = reader.result;
         localStorage.setItem('iconMappings', JSON.stringify(iconMappings));
         alert('Icon added successfully!');
         iconModal.classList.remove('show');
         iconModal.style.display = 'none';
         iconForm.reset();
+        await refreshFileList();
       };
       reader.readAsDataURL(iconFile);
     }
   });
-
-  async function refreshFileList(currentCategory) {
-    const watchFolder = document.getElementById('selected-folder-path').textContent;
-    const listSubfolders = document.getElementById('list-subfolders').checked;
-    const categories = getCategories();
-    if (watchFolder) {
-      const files = await window.api.getFiles(watchFolder, categories, listSubfolders);
-      displayFiles(files, categories, listSubfolders);
-
-      if (currentCategory) {
-        const currentFiles = files[currentCategory] || files.all;
-        const currentCategoryData = categories.find(category => category.name === currentCategory);
-        const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
-        const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
-        displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
-      }
-
-      updateElementCount(files.all.length);
-    }
-  }
 
   // Open Recycle Bin button handler
   document.getElementById('open-recycle-bin-btn').addEventListener('click', async () => {
@@ -210,130 +247,71 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('Failed to open Recycle Bin.');
     }
   });
+});
 
-  window.createFileElement = function createFileElement(file, listSubfolders, categories) {
-    const li = document.createElement('li');
+function updateWatchedFoldersList(watchFolders) {
+  const watchedFoldersList = document.getElementById('watched-folders-list');
+  watchedFoldersList.innerHTML = '';
 
-    // Determine the color and text color based on file category
-    const fileCategory = categories.find(category =>
-      category.extensions.some(ext => file.path.endsWith(ext))
-    );
-    const color = fileCategory ? fileCategory.color : '#f4f4f4'; // Default background color if no category matches
-    const textColor = fileCategory ? fileCategory.textColor : '#000000'; // Default text color if no category matches
-    li.style.backgroundColor = color;
-    li.style.color = textColor;
+  watchFolders.forEach((folderPath, index) => {
+    const listItem = document.createElement('li');
+    listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+    listItem.textContent = folderPath;
 
-    // Get the appropriate icon path
-    const fileExtension = file.isDirectory ? 'folder' : `.${file.path.split('.').pop()}`;
-    const iconPath = iconMappings[fileExtension] || extensionIcons[fileExtension] || './icons/default-icon.png'; // Default icon if no match
+    const removeButton = document.createElement('button');
+    removeButton.className = 'btn btn-danger btn-sm';
+    removeButton.textContent = 'Remove';
+    removeButton.addEventListener('click', async () => {
+      watchFolders.splice(index, 1);
+      updateWatchedFoldersList(watchFolders);
+      saveSettings({
+        watchFolders,
+        categories: getCategories(),
+        listSubfolders: document.getElementById('list-subfolders').checked,
+        showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
+      });
 
-    const iconImg = document.createElement('img');
-    iconImg.src = iconPath;
-    iconImg.alt = fileExtension;
-    iconImg.className = 'file-icon mr-2'; // Add appropriate styling in your CSS
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn btn-danger btn-sm delete-button mr-2';
-    deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; // Ensure the icon HTML is correct
-    deleteBtn.style.display = 'none';
-    deleteBtn.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      if (confirm(`Are you sure you want to send "${file.name}" to the Recycle Bin ?`)) {
-        const success = await window.api.deleteFile(file.path);
-        if (success) {
-          const currentCategory = document.getElementById('current-category-title').textContent;
-          refreshFileList(currentCategory);
-        }
-      }
+      await refreshFileList(); // Refresh file list after updating watched folders
     });
 
-    if (file.isDirectory && !listSubfolders) {
-      const dropdownBtn = document.createElement('button');
-      dropdownBtn.innerHTML = '&#x25BC;'; // Unicode for down arrow
-      dropdownBtn.className = 'btn btn-secondary btn-sm mr-2';
-      let isOpen = false;
-      let subFilesList;
+    listItem.appendChild(removeButton);
+    watchedFoldersList.appendChild(listItem);
+  });
 
-      dropdownBtn.addEventListener('click', async (event) => {
-        event.stopPropagation();
-        if (isOpen) {
-          subFilesList.remove();
-          isOpen = false;
-          dropdownBtn.innerHTML = '&#x25BC;'; // Down arrow
-        } else {
-          const subFiles = await window.api.getFiles(file.path, getCategories(), false);
-          subFilesList = document.createElement('ul');
-          subFilesList.className = 'list-group ml-3';
-          subFiles.all.forEach(subFile => {
-            const subLi = createFileElement(subFile, listSubfolders, categories); // Pass the categories
-            subFilesList.appendChild(subLi);
-          });
-          li.appendChild(subFilesList);
-          isOpen = true;
-          dropdownBtn.innerHTML = '&#x25B2;'; // Up arrow
+  document.getElementById('selected-folder-path').textContent = watchFolders.join(', ');
+}
 
-          toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
-        }
-      });
-      li.appendChild(dropdownBtn);
+async function refreshFileList() {
+  const watchFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
+  const categories = getCategories();
+  const listSubfolders = document.getElementById('list-subfolders').checked;
+  const currentCategory = document.getElementById('current-category-title').textContent;
+
+  showLoading();
+
+  try {
+    const { fileList, countExceeded, fileCount } = await window.api.walkSync(watchFolders, listSubfolders, false);
+
+    // Save all files for later use
+    allFiles = { all: fileList };
+
+    displayFiles(allFiles, categories, listSubfolders);
+
+    if (currentCategory) {
+      const currentFiles = fileList.filter(file => categories.find(category => category.name === currentCategory)?.extensions.some(ext => file.path.endsWith(ext)));
+      const currentCategoryData = categories.find(category => category.name === currentCategory);
+      const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
+      const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
+      displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
     }
 
-    li.appendChild(deleteBtn); // Add the delete button
-    li.appendChild(iconImg); // Add the icon before the file name
-    li.appendChild(document.createTextNode(file.name));
-
-    li.addEventListener('click', async () => {
-      if (!file.isDirectory) {
-        await window.api.logFilePath(file.path);
-        window.api.openFile(file.path);
-      }
-    });
-
-    li.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      window.api.openLocation(file.path);
-    });
-
-    return li;
-  };
-
-  function updateWatchedFoldersList(watchFolders) {
-    const watchedFoldersList = document.getElementById('watched-folders-list');
-    watchedFoldersList.innerHTML = '';
-
-    watchFolders.forEach((folderPath, index) => {
-      const listItem = document.createElement('li');
-      listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-      listItem.textContent = folderPath;
-
-      const removeButton = document.createElement('button');
-      removeButton.className = 'btn btn-danger btn-sm';
-      removeButton.textContent = 'Remove';
-      removeButton.addEventListener('click', async () => {
-        watchFolders.splice(index, 1);
-        updateWatchedFoldersList(watchFolders);
-        saveSettings({
-          watchFolders,
-          categories: getCategories(),
-          listSubfolders: document.getElementById('list-subfolders').checked,
-          showDeleteButtons: document.getElementById('toggle-delete-buttons').checked
-        });
-        const files = await window.api.getFiles(watchFolders, getCategories(), document.getElementById('list-subfolders').checked);
-        displayFiles(files, getCategories(), document.getElementById('list-subfolders').checked);
-        window.api.watchFolder(watchFolders); // Update the watched folders
-
-        // Ensure the current category is displayed
-        displayCategoryFiles(currentCategory, files[currentCategory], '#f4f4f4', '#000000', document.getElementById('list-subfolders').checked, getCategories());
-      });
-
-      listItem.appendChild(removeButton);
-      watchedFoldersList.appendChild(listItem);
-    });
-
-    document.getElementById('selected-folder-path').textContent = watchFolders.join(', ');
+    updateElementCount(fileList.length);
+  } catch (error) {
+    console.error("Error refreshing file list:", error);
+  } finally {
+    hideLoading();
   }
-});
+}
 
 document.getElementById('list-subfolders').addEventListener('change', async () => {
   await handleListSubfoldersChange();
@@ -355,38 +333,51 @@ document.getElementById('cancel-category-btn').addEventListener('click', () => {
   hideCategoryModal();
 });
 
+function showLoading() {
+  const loadingOverlay = document.createElement('div');
+  loadingOverlay.id = 'loading-overlay';
+  loadingOverlay.style.position = 'fixed';
+  loadingOverlay.style.top = '0';
+  loadingOverlay.style.left = '0';
+  loadingOverlay.style.width = '100%';
+  loadingOverlay.style.height = '100%';
+  loadingOverlay.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+  loadingOverlay.style.zIndex = '1000';
+  loadingOverlay.style.display = 'flex';
+  loadingOverlay.style.alignItems = 'center';
+  loadingOverlay.style.justifyContent = 'center';
+  loadingOverlay.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div>';
+  document.body.appendChild(loadingOverlay);
+}
+
+function hideLoading() {
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    document.body.removeChild(loadingOverlay);
+  }
+}
+
 async function handleListSubfoldersChange() {
+  console.log("Handling list subfolders change...");
   const listSubfoldersCheckbox = document.getElementById('list-subfolders');
-  const watchFolder = document.getElementById('selected-folder-path').textContent;
-  const categories = getCategories();
   const listSubfolders = listSubfoldersCheckbox.checked;
   const showDeleteButtons = document.getElementById('toggle-delete-buttons').checked;
-  const currentCategory = document.getElementById('current-category-title').textContent;
 
-  if (listSubfolders) {
-    const files = await window.api.getFiles(watchFolder, categories, true);
-    if (files.all.length > 10000) {
-      const confirm = await window.api.confirmLargeListing(files.all.length);
-      if (!confirm) {
-        listSubfoldersCheckbox.checked = false;
-        return;
-      }
-    }
+  showLoading();
+
+  try {
+    await refreshFileList();
+    saveSettings({
+      watchFolders: document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean),
+      categories: getCategories(),
+      listSubfolders,
+      showDeleteButtons
+    });
+  } catch (error) {
+    console.error("Error listing subfolders:", error);
+  } finally {
+    hideLoading();
   }
-
-  saveSettings({ watchFolder, categories, listSubfolders, showDeleteButtons });
-  const files = await window.api.getFiles(watchFolder, categories, listSubfolders);
-  displayFiles(files, categories, listSubfolders);
-
-  if (currentCategory) {
-    const currentFiles = files[currentCategory] || files.all;
-    const currentCategoryData = categories.find(category => category.name === currentCategory);
-    const color = currentCategoryData ? currentCategoryData.color : '#f4f4f4';
-    const textColor = currentCategoryData ? currentCategoryData.textColor : '#000000';
-    displayCategoryFiles(currentCategory, currentFiles, color, textColor, listSubfolders, categories);
-  }
-
-  updateElementCount(files.all.length);
 }
 
 function handleToggleDeleteButtons() {
@@ -402,12 +393,16 @@ function updateElementCount(count) {
   document.getElementById('element-count').textContent = `Files: ${count}`;
 }
 
-async function displayFiles(files, categories, listSubfolders) {
+function displayFiles(files, categories, listSubfolders) {
   const categoriesContainer = document.getElementById('categories');
   categoriesContainer.innerHTML = ''; // Clear existing categories
 
-  // Save all files for later use in search, including recent files
+  // Save all files for later use
   allFiles = files;
+
+  if (!files.all) {
+    files.all = [];
+  }
 
   // Sort files by modification date (newest to oldest)
   files.all.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
@@ -416,7 +411,7 @@ async function displayFiles(files, categories, listSubfolders) {
   allFilesDiv.addEventListener('click', () => displayCategoryFiles('All Files', files.all, '#f4f4f4', '#000000', listSubfolders, categories));
   categoriesContainer.appendChild(allFilesDiv);
 
-  const recentFilesDiv = createCategoryDiv('Recent Files', '#f4f4f4', '#000000', true);
+  const recentFilesDiv = createCategoryDiv('Recently Opened Files', '#f4f4f4', '#000000', true);
   recentFilesDiv.addEventListener('click', () => displayRecentFiles());
   categoriesContainer.appendChild(recentFilesDiv);
 
@@ -427,7 +422,7 @@ async function displayFiles(files, categories, listSubfolders) {
   });
 
   categories.forEach((category, index) => {
-    const categoryFiles = files[category.name].sort((a, b) => new Date(b.mtime) - new Date(a.mtime)); // Sort category files
+    const categoryFiles = files[category.name]?.sort((a, b) => new Date(b.mtime) - new Date(a.mtime)) || [];
     const categoryDiv = createCategoryDiv(category.name, category.color, category.textColor, false, true);
     categoryDiv.addEventListener('click', () => displayCategoryFiles(category.name, categoryFiles, category.color, category.textColor, listSubfolders, categories));
     categoriesContainer.appendChild(categoryDiv);
@@ -439,12 +434,13 @@ async function displayFiles(files, categories, listSubfolders) {
 
   // Display the first category by default
   if (categories.length > 0) {
-    displayCategoryFiles(categories[0].name, files[categories[0].name], categories[0].color, categories[0].textColor, listSubfolders, categories);
+    displayCategoryFiles(categories[0].name, files[categories[0].name] || [], categories[0].color, categories[0].textColor, listSubfolders, categories);
   }
 }
 
+
 function displayCategoryFiles(categoryName, files, color, textColor, listSubfolders, categories) {
-  currentCategory = categoryName; // Set the current category
+  currentCategory = categoryName;
 
   const categoryTitle = document.getElementById('current-category-title');
   categoryTitle.textContent = categoryName;
@@ -500,9 +496,6 @@ async function displayRecentFiles() {
 
   toggleDeleteButtons(document.getElementById('toggle-delete-buttons').checked);
 }
-
-// Add event listener to a button to trigger displaying recent files
-document.getElementById('show-recent-files-btn').addEventListener('click', displayRecentFiles);
 
 function createCategoryDiv(name, color, textColor, isRecent = false, isCustom = false) {
   const categoryDiv = document.createElement('div');
@@ -626,14 +619,23 @@ function deleteCategory(name) {
 }
 
 function refreshCategoryList() {
-  const watchFolder = document.getElementById('selected-folder-path').textContent;
+  const watchFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
   const listSubfolders = document.getElementById('list-subfolders').checked;
   const categories = getCategories();
-  if (watchFolder) {
-    window.api.getFiles(watchFolder, categories, listSubfolders).then(files => {
+
+  if (watchFolders.length > 0) {
+    window.api.getFiles(watchFolders, categories, listSubfolders).then(files => {
       displayFiles(files, categories, listSubfolders);
       updateElementCount(files.all.length);
+    }).catch(error => {
+      console.error('Error fetching files:', error);
+      displayFiles({ all: [] }, categories, listSubfolders);
+      updateElementCount(0);
     });
+  } else {
+    // No watched folders, just refresh the categories display
+    displayFiles({ all: [] }, categories, listSubfolders);
+    updateElementCount(0);
   }
 }
 
@@ -642,7 +644,12 @@ function moveCategoryUp(index) {
   if (index > 0) {
     [categories[index], categories[index - 1]] = [categories[index - 1], categories[index]];
     saveCategories(categories);
-    refreshFileList();
+    const watchFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
+    const listSubfolders = document.getElementById('list-subfolders').checked;
+    window.api.getFiles(watchFolders, categories, listSubfolders).then(files => {
+      displayFiles(files, categories, listSubfolders);
+      updateElementCount(files.all.length);
+    });
   }
 }
 
@@ -651,7 +658,12 @@ function moveCategoryDown(index) {
   if (index < categories.length - 1) {
     [categories[index], categories[index + 1]] = [categories[index + 1], categories[index]];
     saveCategories(categories);
-    refreshFileList();
+    const watchFolders = document.getElementById('selected-folder-path').textContent.split(', ').filter(Boolean);
+    const listSubfolders = document.getElementById('list-subfolders').checked;
+    window.api.getFiles(watchFolders, categories, listSubfolders).then(files => {
+      displayFiles(files, categories, listSubfolders);
+      updateElementCount(files.all.length);
+    });
   }
 }
 
