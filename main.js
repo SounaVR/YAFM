@@ -4,12 +4,12 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
-let watcher;
+let watchers = [];
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
-    height: 600,
+    height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -28,6 +28,8 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', function () {
+  watchers.forEach(watcher => watcher.close());
+  watchers = [];
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -103,46 +105,66 @@ ipcMain.handle('select-folder', async () => {
   }
 });
 
-const walkSync = async (dirs, listSubfolders, fileList = []) => {
+const walkSync = async (dirs, listSubfolders, countFilesOnly = false) => {
   if (!Array.isArray(dirs)) {
     dirs = [dirs];
   }
 
-  for (const dir of dirs) {
+  let fileCount = 0;
+  const fileList = [];
+  const queue = [...dirs];
+
+  const processDir = async (dir) => {
     try {
       const files = await fs.promises.readdir(dir);
       for (const file of files) {
         const filePath = path.join(dir, file);
         const stats = await fs.promises.stat(filePath);
-        if (stats.isDirectory()) {
-          fileList.push({ path: filePath, name: file, isDirectory: true, mtime: stats.mtime });
-          if (listSubfolders) {
-            await walkSync(filePath, listSubfolders, fileList);
-          }
+
+        if (countFilesOnly) {
+          fileCount++;
         } else {
-          fileList.push({ path: filePath, name: file, isDirectory: false, mtime: stats.mtime });
+          if (stats.isDirectory()) {
+            fileList.push({ path: filePath, name: file, isDirectory: true, mtime: stats.mtime });
+            if (listSubfolders) {
+              queue.push(filePath);
+            }
+          } else {
+            fileList.push({ path: filePath, name: file, isDirectory: false, mtime: stats.mtime });
+            fileCount++;
+          }
+        }
+
+        if (countFilesOnly && fileCount > 5000) {
+          return { fileList, countExceeded: true, fileCount };
         }
       }
     } catch (error) {
       console.error('Error walking through directory:', error);
     }
+  };
+
+  while (queue.length) {
+    const dir = queue.shift();
+    await processDir(dir);
   }
 
-  return fileList;
+  return { fileList, countExceeded: fileCount > 5000, fileCount };
 };
 
-ipcMain.handle('get-files', async (event, folderPaths, categories, listSubfolders) => {
-  if (!Array.isArray(folderPaths)) {
-    folderPaths = [folderPaths];
-  }
+ipcMain.handle('walk-sync', async (event, dirs, listSubfolders, countFilesOnly = false) => {
+  const result = await walkSync(dirs, listSubfolders, countFilesOnly);
+  return result;
+});
 
+ipcMain.handle('get-files', async (event, folderPaths, categories, listSubfolders) => {
   try {
-    const allFiles = await walkSync(folderPaths, listSubfolders);
+    const { fileList, countExceeded } = await walkSync(folderPaths, listSubfolders);
     const recentFiles = await readRecentFiles();
-    const categorizedFiles = { all: allFiles, recent: recentFiles };
+    const categorizedFiles = { all: fileList, recent: recentFiles };
 
     categories.forEach(category => {
-      categorizedFiles[category.name] = allFiles.filter(file =>
+      categorizedFiles[category.name] = fileList.filter(file =>
         category.extensions.some(ext => file.path.endsWith(ext))
       );
     });
@@ -207,53 +229,36 @@ ipcMain.handle('load-settings', async () => {
 });
 
 ipcMain.handle('confirm-large-listing', async (event, count) => {
-  try {
-    const result = await dialog.showMessageBox({
-      type: 'warning',
-      buttons: ['Continue', 'Cancel'],
-      defaultId: 1,
-      title: 'Large Listing',
-      message: `Listing ${count} items may take a while. Do you want to continue?`
-    });
-    return result.response === 0;
-  } catch (error) {
-    console.error('Error confirming large listing:', error);
-    return false;
-  }
+  const result = await dialog.showMessageBox({
+    type: 'warning',
+    buttons: ['Continue', 'Cancel'],
+    defaultId: 1,
+    title: 'Large Listing',
+    message: `Listing ${count} items may take a while. Do you want to continue?`
+  });
+  return result.response === 0;
 });
-
-
 
 //watcher
 ipcMain.handle('watch-folder', (event, folderPaths) => {
-  if (!Array.isArray(folderPaths)) {
-    folderPaths = [folderPaths];
-  }
+  // Close existing watchers
+  watchers.forEach(watcher => watcher.close());
+  watchers = [];
 
-  if (watcher) {
-    watcher.close();
-  }
-
-  watcher = fs.watch(folderPaths[0], { recursive: true }, (eventType, filename) => {
-    if (filename) {
-      mainWindow.webContents.send('refresh-files');
-    }
-  });
-
-  for (const folderPath of folderPaths.slice(1)) {
-    fs.watch(folderPath, { recursive: true }, (eventType, filename) => {
-      if (filename) {
+  folderPaths.forEach(folderPath => {
+    const watcher = fs.watch(folderPath, (eventType, filename) => {
+      if (filename && mainWindow && mainWindow.webContents) {
         mainWindow.webContents.send('refresh-files');
       }
     });
-  }
+
+    watchers.push(watcher);
+  });
 });
 
 ipcMain.handle('stop-watching', () => {
-  if (watcher) {
-    watcher.close();
-    watcher = null;
-  }
+  watchers.forEach(watcher => watcher.close());
+  watchers = [];
 });
 
 ipcMain.handle('open-recycle-bin', async () => {
